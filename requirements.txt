@@ -1,0 +1,5 @@
+fastapi>=0.115,<1
+pymongo>=4.10,<5
+dnspython>=2.7,<3
+playwright>=1.45,<2
+uvicorn[standard]>=0.30,<1

@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f1eee5">
+<title>PinFrames - by jolly with ai</title>
+<style>
+:root { --paper:#f1eee5; --ink:#202522; --muted:#73786f; --line:#d8d4c9; --accent:#b6503d; }
+* { box-sizing:border-box; }
+html, body { width:100%; height:100%; margin:0; background:var(--paper); overflow:hidden; color:var(--ink); }
+body { font-family:Georgia,"Times New Roman",serif; }
+#frame { position:fixed; inset:68px 0 58px; background:var(--paper); overflow:hidden; }
+.layer {
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; filter:blur(0); transform:scale(1.008);
+  transition:opacity 1800ms ease, filter 1800ms ease, transform 1800ms ease;
+  pointer-events:none;
+}
+.layer img {
+  position:absolute;
+  inset:3.5vmin 6vmin;
+  width:calc(100% - 12vmin);
+  height:calc(100% - 7vmin);
+  max-width:none;
+  max-height:none;
+  object-fit:contain;
+  object-position:center center;
+  display:block;
+  user-select:none;
+  -webkit-user-drag:none;
+}
+.layer.active { opacity:1; filter:blur(0); transform:scale(1); }
+.layer.enter { opacity:0; filter:blur(36px); transform:scale(1.012); transition:none; }
+.layer.leaving { opacity:0; filter:blur(36px); transform:scale(1.012); }
+.bar { position:fixed; z-index:2; left:0; right:0; display:flex; align-items:center; justify-content:space-between; padding:0 4vw; background:var(--paper); }
+.topbar { top:0; height:68px; border-bottom:1px solid var(--line); }
+.bottombar { bottom:0; height:58px; border-top:1px solid var(--line); font:12px/1.2 Arial,sans-serif; }
+#frame:fullscreen { inset:0; width:100vw; height:100vh; background:var(--paper); }
+#frame:fullscreen .layer img { inset:4vmin; width:calc(100% - 8vmin); height:calc(100% - 8vmin); }
+.brand { display:flex; align-items:center; gap:12px; min-width:0; }
+.brand-mark { width:28px; height:28px; display:grid; place-items:center; background:var(--ink); color:var(--paper); font:bold 11px/1 Arial,sans-serif; }
+.brand-copy { display:grid; gap:3px; }
+.brand-title { font-size:17px; line-height:1; }
+.brand-subtitle, .setting-label, .unit, .counter, .message { color:var(--muted); font:10px/1.2 Arial,sans-serif; letter-spacing:.08em; text-transform:uppercase; }
+.settings, .actions { display:flex; align-items:center; gap:16px; }
+.library-actions { display:flex; align-items:center; gap:8px; }
+.setting-group { display:flex; align-items:center; gap:8px; }
+.setting-label { white-space:nowrap; }
+input, select, button { font:12px/1.2 Arial,sans-serif; color:var(--ink); }
+input, select { height:34px; border:1px solid var(--line); border-radius:0; background:transparent; }
+input { width:64px; padding:0 8px; }
+#background-color { width:88px; text-transform:uppercase; }
+#refresh-amount { width:56px; }
+#refresh-unit { width:88px; }
+select { padding:0 22px 0 8px; }
+button { min-height:34px; border:1px solid var(--line); border-radius:0; padding:0 12px; background:transparent; cursor:pointer; }
+button:hover { border-color:var(--ink); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.counter { min-width:90px; font-variant-numeric:tabular-nums; }
+.message { min-width:100px; text-transform:none; letter-spacing:0; }
+.progress { position:absolute; left:0; right:0; bottom:0; height:2px; background:transparent; }
+.progress-fill { display:block; width:0; height:100%; background:var(--accent); }
+#empty { display:none; position:fixed; inset:68px 0 58px; place-items:center; padding:32px; text-align:center; color:var(--muted); font:14px/1.5 Arial,sans-serif; }
+#empty.show { display:grid; }
+dialog { width:min(420px,calc(100vw - 32px)); border:1px solid var(--line); border-radius:0; padding:24px; background:var(--paper); color:var(--ink); }
+dialog::backdrop { background:rgba(20,28,25,.48); }
+dialog h2 { margin:0 0 18px; font:20px/1.2 Georgia,"Times New Roman",serif; }
+dialog label { display:grid; gap:8px; color:var(--muted); font:12px/1.3 Arial,sans-serif; }
+dialog input { width:100%; }
+.dialog-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+@media (max-width:640px) {
+  .bar { padding:0 16px; }
+  .topbar { height:180px; flex-direction:column; align-items:stretch; justify-content:center; gap:8px; }
+  .settings { display:grid; grid-template-columns:138px minmax(0,1fr); gap:6px 8px; }
+  .setting-group:first-child { grid-column:1 / -1; }
+  .setting-group { gap:5px; }
+  .setting-label { max-width:62px; white-space:normal; }
+  #background-color { width:78px; }
+  #refresh-amount { width:46px; }
+  #refresh-unit { width:72px; padding-left:5px; padding-right:12px; }
+  #frame { inset:180px 0 72px; }
+  #empty { inset:180px 0 72px; }
+  .bottombar { height:72px; align-items:flex-start; padding-top:10px; }
+  .brand-subtitle { display:none; }
+  .actions { position:absolute; right:16px; bottom:8px; gap:6px; }
+  button { min-height:30px; padding:0 8px; }
+  .counter { min-width:auto; }
+  .message { max-width:40vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .layer img { inset:4vmin; width:calc(100% - 8vmin); height:calc(100% - 8vmin); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .layer { transition-duration:300ms; }
+}
+</style>
+</head>
+<body>
+<header class="bar topbar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">PF</span>
+    <div class="brand-copy">
+      <span class="brand-title">PinFrames</span>
+      <span class="brand-subtitle">by jolly with ai</span>
+    </div>
+  </div>
+  <div class="settings">
+    <div class="setting-group">
+      <label class="setting-label" for="interval">Change every</label>
+      <input id="interval" type="number" min="3" max="1440" step="1" value="30" aria-label="Image change interval">
+      <select id="unit" aria-label="Interval unit">
+        <option value="minutes" selected>min</option>
+        <option value="seconds">sec</option>
+      </select>
+    </div>
+    <div class="setting-group">
+      <label class="setting-label" for="background-color">Background</label>
+      <input id="background-color" type="text" value="#F1EEE5" maxlength="7" spellcheck="false" aria-label="Background color hex code">
+    </div>
+    <div class="setting-group">
+      <label class="setting-label" for="refresh-amount">Refresh after</label>
+      <input id="refresh-amount" type="number" min="1" max="365" step="1" value="1" aria-label="Scrape age threshold">
+      <select id="refresh-unit" aria-label="Scrape age unit">
+        <option value="minutes">min</option>
+        <option value="hours">hours</option>
+        <option value="days" selected>days</option>
+      </select>
+    </div>
+  </div>
+  <div class="library-actions">
+    <button id="pinterest-account" type="button" title="Log in or sign out of Pinterest">Log in</button>
+    <button id="scrape-again" type="button">Scrape again</button>
+    <button id="delete-links" type="button">Delete saved links</button>
+  </div>
+</header>
+<main id="frame">
+  <div class="layer" id="layerA"><img id="imgA" alt="Pinterest home-feed image" draggable="false"></div>
+  <div class="layer" id="layerB"><img id="imgB" alt="" draggable="false"></div>
+</main>
+<div id="empty" role="status">Loading your image links…</div>
+<dialog id="feed-dialog">
+  <form id="feed-form">
+    <h2>Connect to PinFrames</h2>
+    <label for="feed-token-input">Private feed token
+      <input id="feed-token-input" type="password" autocomplete="off" spellcheck="false" required>
+    </label>
+    <div class="dialog-actions">
+      <button id="disconnect-feed" type="button">Disconnect</button>
+      <button id="cancel-feed" type="button">Cancel</button>
+      <button type="submit">Connect</button>
+    </div>
+  </form>
+</dialog>
+<footer class="bar bottombar">
+  <div class="counter"><span id="position">000</span> / <span id="total">000</span></div>
+  <div class="message" id="message" role="status">Loading image list</div>
+  <div class="actions">
+    <button id="pause" type="button">Pause</button>
+    <button id="next" type="button">Next</button>
+    <button id="fullscreen" type="button">Fullscreen</button>
+  </div>
+  <div class="progress" aria-hidden="true"><span class="progress-fill" id="progress"></span></div>
+</footer>
+<script>
+const layers=[document.getElementById('layerA'),document.getElementById('layerB')];
+const images=[document.getElementById('imgA'),document.getElementById('imgB')];
+const intervalInput=document.getElementById('interval');
+const unitSelect=document.getElementById('unit');
+const backgroundInput=document.getElementById('background-color');
+const refreshAmount=document.getElementById('refresh-amount');
+const refreshUnit=document.getElementById('refresh-unit');
+const frame=document.getElementById('frame');
+const fullscreenButton=document.getElementById('fullscreen');
+const position=document.getElementById('position');
+const total=document.getElementById('total');
+const message=document.getElementById('message');
+const empty=document.getElementById('empty');
+const pauseButton=document.getElementById('pause');
+const progress=document.getElementById('progress');
+const consumeUrl=new URL('/api/consume',location.href);
+const settingsUrl=new URL('/api/settings',location.href);
+const configUrl=new URL('/api/config',location.href);
+const imagesUrl=new URL('/api/images',location.href);
+const authUrl=new URL('/api/auth',location.href);
+const loginUrl=new URL('/api/login',location.href);
+const logoutUrl=new URL('/api/logout',location.href);
+const scrapeUrl=new URL('/api/scrape',location.href);
+const clearUrl=new URL('/api/clear',location.href);
+const settingsKey='pinterest-frame-settings';
+const feedTokenKey='pinframes-feed-token';
+let urls=[];
+let displayedCount=0;
+let totalCount=0;
+let currentLayer=0;
+let timer=null;
+let paused=false;
+let changing=false;
+let consumeBlocked=false;
+let noticeTimer=null;
+let pinterestSignedIn=false;
+let cloudMode=false;
+let feedToken=localStorage.getItem(feedTokenKey)||'';
+
+function apiFetch(url,options={}){
+  const headers=new Headers(options.headers||{});
+  if(cloudMode&&feedToken)headers.set('Authorization',`Bearer ${feedToken}`);
+  return fetch(url,{...options,headers});
+}
+
+function showNotice(text){
+  clearTimeout(noticeTimer);
+  message.textContent=text;
+  noticeTimer=setTimeout(()=>{
+    message.textContent='';
+    noticeTimer=null;
+  },3000);
+}
+function persistSettings(){
+  localStorage.setItem(settingsKey,JSON.stringify({
+    amount:Number(intervalInput.value),
+    unit:unitSelect.value,
+    backgroundColor:backgroundInput.value,
+  }));
+}
+
+function loadSettings(){
+  try{
+    const settings=JSON.parse(localStorage.getItem(settingsKey)||'{}');
+    if(settings.amount)intervalInput.value=String(settings.amount);
+    if(settings.unit==='minutes')unitSelect.value='minutes';
+    if(/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(settings.backgroundColor||'')){
+      backgroundInput.value=settings.backgroundColor.toUpperCase();
+      document.documentElement.style.setProperty('--paper',settings.backgroundColor);
+    }
+  }catch{}
+}
+async function loadRefreshSettings(){
+  try{
+    const response=await apiFetch(settingsUrl,{cache:'no-store'});
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    const settings=await response.json();
+    const seconds=settings.refresh_after_seconds;
+    if(seconds%(24*60*60)===0){
+      refreshAmount.value=String(seconds/(24*60*60));
+      refreshUnit.value='days';
+    }else if(seconds%(60*60)===0){
+      refreshAmount.value=String(seconds/(60*60));
+      refreshUnit.value='hours';
+    }else{
+      refreshAmount.value=String(Math.max(1,Math.round(seconds/60)));
+      refreshUnit.value='minutes';
+    }
+  }catch(error){
+    showNotice(`Could not load scrape schedule: ${error.message}`);
+  }
+}
+async function loadPinterestStatus(){
+  try{
+    const response=await apiFetch(authUrl,{cache:'no-store'});
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    const result=await response.json();
+    pinterestSignedIn=Boolean(result.signed_in);
+    updateAccountButton();
+  }catch(error){
+    showNotice(`Could not load Pinterest status: ${error.message}`);
+  }
+}
+function updateAccountButton(){
+  const button=document.getElementById('pinterest-account');
+  if(cloudMode){
+    button.textContent=feedToken?'Feed key saved':'Connect feed';
+    button.title='Enter or change the private PinFrames feed token';
+  }else{
+    button.textContent=pinterestSignedIn?'Sign out':'Log in';
+    button.title=pinterestSignedIn?'Sign out of Pinterest':'Log in to Pinterest';
+  }
+}
+function showFeedTokenRequired(){
+  empty.textContent='Connect your private feed to view its images.';
+  empty.classList.add('show');
+  message.textContent='Feed key required';
+}
+async function initializeApp(){
+  try{
+    const response=await fetch(configUrl,{cache:'no-store'});
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    cloudMode=Boolean((await response.json()).requires_feed_token);
+    updateAccountButton();
+    if(cloudMode){
+      if(!feedToken){
+        showFeedTokenRequired();
+        return;
+      }
+      const auth=await apiFetch(authUrl,{cache:'no-store'});
+      if(!auth.ok){
+        localStorage.removeItem(feedTokenKey);
+        feedToken='';
+        updateAccountButton();
+        showFeedTokenRequired();
+        showNotice('Feed token is invalid or unavailable');
+        return;
+      }
+    }else{
+      await loadPinterestStatus();
+    }
+    await Promise.all([loadRefreshSettings(),loadImages()]);
+  }catch(error){
+    empty.textContent='Could not connect to the PinFrames API.';
+    empty.classList.add('show');
+    showNotice(error.message);
+  }
+}
+function intervalMs(){
+  const amount=Math.min(1440,Math.max(3,Number(intervalInput.value)||30));
+  intervalInput.value=String(amount);
+  return amount*(unitSelect.value==='minutes'?60000:1000);
+}
+function saveSettings(){
+  intervalMs();
+  persistSettings();
+  showNotice('Timing saved');
+  scheduleNext();
+}
+function saveBackground(){
+  const color=backgroundInput.value.trim();
+  if(!/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(color)){
+    backgroundInput.value=getComputedStyle(document.documentElement).getPropertyValue('--paper').trim().toUpperCase();
+    showNotice('Use a hex code such as #F1EEE5');
+    return;
+  }
+  backgroundInput.value=color.toUpperCase();
+  document.documentElement.style.setProperty('--paper',color);
+  persistSettings();
+  showNotice('Background saved');
+}
+async function saveRefreshSettings(){
+  const multipliers={minutes:60,hours:3600,days:86400};
+  const maxAmount=refreshUnit.value==='days'?365:refreshUnit.value==='hours'?8760:525600;
+  const amount=Math.min(maxAmount,Math.max(1,Math.round(Number(refreshAmount.value)||1)));
+  refreshAmount.value=String(amount);
+  const seconds=amount*multipliers[refreshUnit.value];
+  try{
+    const response=await apiFetch(settingsUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_after_seconds:seconds})});
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    showNotice('Scrape age saved for next start');
+  }catch(error){
+    showNotice(`Could not save scrape age: ${error.message}`);
+  }
+}
+function scheduleNext(){
+  clearTimeout(timer);
+  progress.style.transition='none';
+  progress.style.width='0';
+  if(paused||urls.length===0)return;
+  const duration=intervalMs();
+  requestAnimationFrame(()=>{
+    progress.style.transition=`width ${duration}ms linear`;
+    progress.style.width='100%';
+  });
+  timer=setTimeout(async()=>{
+    await advance();
+    scheduleNext();
+  },duration);
+}
+function renderAt(index,immediate=false){
+  if(changing||!urls.length)return Promise.resolve(false);
+  changing=true;
+  const url=urls[index];
+  const nextLayer=currentLayer===0?1:0;
+  const oldLayer=layers[currentLayer];
+  const preload=new Image();
+  return new Promise(resolve=>{
+    preload.onload=async()=>{
+      try{
+        const response=await apiFetch(consumeUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:url})});
+        if(!response.ok)throw new Error(`HTTP ${response.status}`);
+        const result=await response.json();
+        if(!result.removed)throw new Error('The link was no longer in image-links.txt');
+      }catch(error){
+        consumeBlocked=true;
+        message.textContent=`Could not remove image link: ${error.message}`;
+        changing=false;
+        resolve(false);
+        return;
+      }
+
+      images[nextLayer].src=url;
+      if(immediate){
+        oldLayer.classList.remove('active','leaving');
+        layers[nextLayer].classList.remove('enter','leaving');
+        layers[nextLayer].classList.add('active');
+      }else{
+        layers[nextLayer].classList.remove('active','leaving');
+        layers[nextLayer].classList.add('enter');
+        void layers[nextLayer].offsetWidth;
+        requestAnimationFrame(()=>{
+          layers[nextLayer].classList.remove('enter');
+          layers[nextLayer].classList.add('active');
+          oldLayer.classList.remove('active');
+          oldLayer.classList.add('leaving');
+        });
+        const finishLeaving=event=>{
+          if(event.target!==oldLayer||event.propertyName!=='opacity')return;
+          oldLayer.classList.remove('leaving');
+          oldLayer.removeEventListener('transitionend',finishLeaving);
+        };
+        oldLayer.addEventListener('transitionend',finishLeaving);
+      }
+      currentLayer=nextLayer;
+      urls.splice(index,1);
+      displayedCount++;
+      position.textContent=String(displayedCount).padStart(3,'0');
+      total.textContent=String(totalCount).padStart(3,'0');
+      empty.classList.remove('show');
+      message.textContent='';
+      changing=false;
+      resolve(true);
+    };
+    preload.onerror=()=>{
+      showNotice('Skipping an unavailable image');
+      changing=false;
+      resolve(false);
+    };
+    preload.src=urls[index];
+  });
+}
+async function advance(immediate=false){
+  if(changing||!urls.length)return;
+  consumeBlocked=false;
+  for(let index=0;index<urls.length;index++){
+    if(await renderAt(index,immediate))return;
+    if(consumeBlocked)return;
+  }
+  empty.textContent='No remaining image links could be loaded.';
+  empty.classList.add('show');
+}
+async function loadImages(){
+  try{
+    const response=await apiFetch(imagesUrl,{cache:'no-store'});
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    const data=await response.json();
+    urls=Array.isArray(data.images)?data.images:[];
+    totalCount=urls.length;
+    total.textContent=String(totalCount).padStart(3,'0');
+    if(!urls.length){
+      empty.textContent=cloudMode?'No saved images. Run the collector on your signed-in computer.':'No image URLs in image-links.txt. Run the scraper to add more images.';
+      empty.classList.add('show');
+      message.textContent='Image list is empty';
+      return;
+    }
+    await advance(true);
+    scheduleNext();
+  }catch(error){
+    empty.textContent='Could not read image-links.txt. Start the web server from the VSC workspace folder.';
+    empty.classList.add('show');
+    message.textContent=error.message;
+  }
+}
+async function scrapeAgain(){
+  if(cloudMode){
+    showNotice('Run the collector on your signed-in computer to refresh this feed.');
+    return;
+  }
+  const button=document.getElementById('scrape-again');
+  if(button.disabled)return;
+  const wasPaused=paused;
+  paused=true;
+  clearTimeout(timer);
+  button.disabled=true;
+  document.getElementById('delete-links').disabled=true;
+  message.textContent='Scraping Pinterest feed…';
+  try{
+    const response=await apiFetch(scrapeUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    const result=await response.json();
+    if(!response.ok)throw new Error(result.message||'Scrape failed');
+    await loadImages();
+    showNotice(`Scrape complete: ${result.count} links`);
+  }catch(error){
+    showNotice(error.message);
+  }finally{
+    button.disabled=false;
+    document.getElementById('delete-links').disabled=false;
+    paused=wasPaused;
+    scheduleNext();
+  }
+}
+async function deleteSavedLinks(){
+  if(!window.confirm('Delete all saved Pinterest image links? This cannot be undone.'))return;
+  try{
+    const response=await apiFetch(clearUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    const result=await response.json();
+    if(!response.ok||!result.ok)throw new Error(result.error||'Could not delete saved links');
+    clearTimeout(timer);
+    urls=[];
+    totalCount=0;
+    displayedCount=0;
+    total.textContent='000';
+    position.textContent='000';
+    for(const image of images)image.removeAttribute('src');
+    for(const layer of layers)layer.classList.remove('active','enter','leaving');
+    empty.textContent='No saved image links. Choose Scrape again to refill the list.';
+    empty.classList.add('show');
+    showNotice('Saved links deleted');
+  }catch(error){
+    showNotice(error.message);
+  }
+}
+async function togglePinterestAccount(){
+  if(cloudMode){
+    document.getElementById('feed-token-input').value=feedToken;
+    document.getElementById('feed-dialog').showModal();
+    return;
+  }
+  const button=document.getElementById('pinterest-account');
+  const wasPaused=paused;
+  if(pinterestSignedIn&&!window.confirm('Sign out of the Pinterest account saved in FRAME?'))return;
+  paused=true;
+  clearTimeout(timer);
+  button.disabled=true;
+  document.getElementById('scrape-again').disabled=true;
+  document.getElementById('delete-links').disabled=true;
+  message.textContent=pinterestSignedIn?'Signing out of Pinterest…':'Sign in in the opened window; keep it open until the scrape completes.';
+  try{
+    const response=await fetch(pinterestSignedIn?logoutUrl:loginUrl,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:'{}',
+    });
+    const result=await response.json();
+    if(!response.ok||result.ok===false)throw new Error(result.error||result.message||'Pinterest account action failed');
+    pinterestSignedIn=!pinterestSignedIn;
+    updateAccountButton();
+    if(pinterestSignedIn){
+      await loadImages();
+      showNotice('Pinterest account connected');
+    }else{
+      showNotice('Signed out of Pinterest');
+    }
+  }catch(error){
+    showNotice(error.message);
+  }finally{
+    button.disabled=false;
+    document.getElementById('scrape-again').disabled=false;
+    document.getElementById('delete-links').disabled=false;
+    paused=wasPaused;
+    scheduleNext();
+  }
+}
+document.getElementById('feed-form').addEventListener('submit',async event=>{
+  event.preventDefault();
+  const candidate=document.getElementById('feed-token-input').value.trim();
+  if(!candidate)return;
+  const oldToken=feedToken;
+  feedToken=candidate;
+  try{
+    const response=await apiFetch(authUrl,{cache:'no-store'});
+    if(!response.ok)throw new Error('Feed token was rejected');
+    localStorage.setItem(feedTokenKey,feedToken);
+    document.getElementById('feed-dialog').close();
+    updateAccountButton();
+    await Promise.all([loadRefreshSettings(),loadImages()]);
+  }catch(error){
+    feedToken=oldToken;
+    showNotice(error.message);
+  }
+});
+document.getElementById('cancel-feed').addEventListener('click',()=>document.getElementById('feed-dialog').close());
+document.getElementById('disconnect-feed').addEventListener('click',()=>{
+  localStorage.removeItem(feedTokenKey);
+  feedToken='';
+  document.getElementById('feed-dialog').close();
+  updateAccountButton();
+  clearTimeout(timer);
+  urls=[];
+  for(const image of images)image.removeAttribute('src');
+  for(const layer of layers)layer.classList.remove('active','enter','leaving');
+  showFeedTokenRequired();
+});
+intervalInput.addEventListener('change',saveSettings);
+unitSelect.addEventListener('change',saveSettings);
+backgroundInput.addEventListener('change',saveBackground);
+backgroundInput.addEventListener('keydown',event=>{if(event.key==='Enter')backgroundInput.blur();});
+refreshAmount.addEventListener('change',saveRefreshSettings);
+refreshUnit.addEventListener('change',saveRefreshSettings);
+document.getElementById('next').addEventListener('click',async()=>{await advance();scheduleNext();});
+document.getElementById('pinterest-account').addEventListener('click',togglePinterestAccount);
+document.getElementById('scrape-again').addEventListener('click',scrapeAgain);
+document.getElementById('delete-links').addEventListener('click',deleteSavedLinks);
+pauseButton.addEventListener('click',()=>{
+  paused=!paused;
+  pauseButton.textContent=paused?'Resume':'Pause';
+  showNotice(paused?'Rotation paused':'Rotation resumed');
+  scheduleNext();
+});
+fullscreenButton.addEventListener('click',()=>{
+  if(document.fullscreenElement===frame)document.exitFullscreen?.();
+  else frame.requestFullscreen?.().catch(()=>{});
+});
+document.addEventListener('fullscreenchange',()=>{
+  fullscreenButton.textContent=document.fullscreenElement===frame?'Exit fullscreen':'Fullscreen';
+});
+document.addEventListener('keydown',event=>{
+  if(event.target.matches('input,select,button'))return;
+  if(event.code==='Space'){
+    event.preventDefault();pauseButton.click();
+  }else if(event.code==='ArrowRight'||event.code==='KeyR'){
+    event.preventDefault();document.getElementById('next').click();
+  }else if(event.code==='KeyF'){
+    event.preventDefault();document.getElementById('fullscreen').click();
+  }
+});
+loadSettings();
+initializeApp();
+</script>
+</body>
+</html>
