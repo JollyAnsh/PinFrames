@@ -176,6 +176,6 @@ def clear_images(_authorized: None = Depends(authorize_feed)):
     return {"ok": True, "remaining": 0}
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def home():
     return FileResponse(ROOT / "display" / "index.html")
