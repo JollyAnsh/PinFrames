@@ -1,5 +1,6 @@
 import argparse
 import json
+import re
 import subprocess
 import sys
 from threading import Lock
@@ -158,9 +159,12 @@ class FrameHandler(SimpleHTTPRequestHandler):
             return
         if urlsplit(self.path).path == "/api/settings":
             state = load_state()
-            self.send_json({
-                "refresh_after_seconds": state.get("refresh_after_seconds", DEFAULT_REFRESH_AFTER)
-            })
+            settings = {"refresh_after_seconds": state.get("refresh_after_seconds", DEFAULT_REFRESH_AFTER)}
+            if "interval_seconds" in state:
+                settings["interval_seconds"] = state["interval_seconds"]
+            if "background_color" in state:
+                settings["background_color"] = state["background_color"]
+            self.send_json(settings)
             return
         if urlsplit(self.path).path == "/":
             self.send_response(302)
@@ -227,13 +231,32 @@ class FrameHandler(SimpleHTTPRequestHandler):
             if not isinstance(payload, dict):
                 raise ValueError("Request body must be a JSON object")
             if request_path == "/api/settings":
-                refresh_after = payload.get("refresh_after_seconds")
-                if isinstance(refresh_after, bool) or not isinstance(refresh_after, int):
-                    raise ValueError("Refresh age must be an integer number of seconds")
-                if not 60 <= refresh_after <= MAX_REFRESH_AFTER:
-                    raise ValueError("Refresh age must be between 1 minute and 365 days")
-                save_state({"refresh_after_seconds": refresh_after})
-                self.send_json({"ok": True, "refresh_after_seconds": refresh_after})
+                updates = {}
+                if "refresh_after_seconds" in payload:
+                    refresh_after = payload["refresh_after_seconds"]
+                    if isinstance(refresh_after, bool) or not isinstance(refresh_after, int):
+                        raise ValueError("Refresh age must be an integer number of seconds")
+                    if not 60 <= refresh_after <= MAX_REFRESH_AFTER:
+                        raise ValueError("Refresh age must be between 1 minute and 365 days")
+                    updates["refresh_after_seconds"] = refresh_after
+                if "interval_seconds" in payload:
+                    interval = payload["interval_seconds"]
+                    if isinstance(interval, bool) or not isinstance(interval, int):
+                        raise ValueError("Image interval must be an integer number of seconds")
+                    if not 3 <= interval <= 86400:
+                        raise ValueError("Image interval must be between 3 seconds and 24 hours")
+                    updates["interval_seconds"] = interval
+                if "background_color" in payload:
+                    background_color = payload["background_color"]
+                    if not isinstance(background_color, str) or not re.fullmatch(
+                        r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})", background_color
+                    ):
+                        raise ValueError("Background color must be a 3- or 6-digit hex code")
+                    updates["background_color"] = background_color.upper()
+                if not updates:
+                    raise ValueError("At least one setting is required")
+                save_state(updates)
+                self.send_json({"ok": True, **updates})
                 return
 
             image_url = payload.get("image")

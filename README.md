@@ -60,7 +60,7 @@ On later starts, run:
 
 The collector checks the shared refresh age and skips a fresh feed. Use `--force` to scrape regardless of age. Set this command to run at login on the collector computer if you want the startup check to happen automatically. The browser profile stays on that computer; only image URLs are uploaded.
 
-The viewer advances in order and removes each displayed URL from MongoDB. **Delete saved links** clears the cloud feed. **Scrape again** explains how to run the collector because a hosted website cannot launch a process on your computer.
+The viewer advances in order and removes each displayed URL from MongoDB. Rotation interval, background color, and refresh age are saved with the shared feed settings and apply on other devices; the private feed token remains stored only in each browser. The viewer starts in an immersive full-viewport layout, with the controls revealed by pointer movement or a touch. Browsers that do not permit native fullscreen on page load use this immersive layout instead. **Delete saved links** clears the cloud feed. **Scrape again** explains how to run the collector because a hosted website cannot launch a process on your computer.
 
 ## Local mode
 

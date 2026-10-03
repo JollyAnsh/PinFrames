@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hmac
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
@@ -108,26 +109,52 @@ def check_feed_token(_authorized: None = Depends(authorize_feed)):
 def get_settings(_authorized: None = Depends(authorize_feed)):
     document = get_feed_document()
     last_scraped_at = document.get("last_scraped_at")
-    return {
+    settings = {
         "refresh_after_seconds": document.get("refresh_after_seconds", DEFAULT_REFRESH_AFTER),
         "last_scraped_at": last_scraped_at.isoformat() if last_scraped_at else None,
     }
+    if "interval_seconds" in document:
+        settings["interval_seconds"] = document["interval_seconds"]
+    if "background_color" in document:
+        settings["background_color"] = document["background_color"]
+    return settings
 
 
 @app.post("/api/settings")
 def update_settings(payload: dict, _authorized: None = Depends(authorize_feed)):
-    refresh_after = payload.get("refresh_after_seconds")
-    if isinstance(refresh_after, bool) or not isinstance(refresh_after, int):
-        raise HTTPException(status_code=400, detail="Refresh age must be an integer number of seconds")
-    if not 60 <= refresh_after <= MAX_REFRESH_AFTER:
-        raise HTTPException(status_code=400, detail="Refresh age must be between 1 minute and 365 days")
+    updates = {}
+    if "refresh_after_seconds" in payload:
+        refresh_after = payload["refresh_after_seconds"]
+        if isinstance(refresh_after, bool) or not isinstance(refresh_after, int):
+            raise HTTPException(status_code=400, detail="Refresh age must be an integer number of seconds")
+        if not 60 <= refresh_after <= MAX_REFRESH_AFTER:
+            raise HTTPException(status_code=400, detail="Refresh age must be between 1 minute and 365 days")
+        updates["refresh_after_seconds"] = refresh_after
 
+    if "interval_seconds" in payload:
+        interval = payload["interval_seconds"]
+        if isinstance(interval, bool) or not isinstance(interval, int):
+            raise HTTPException(status_code=400, detail="Image interval must be an integer number of seconds")
+        if not 3 <= interval <= 86400:
+            raise HTTPException(status_code=400, detail="Image interval must be between 3 seconds and 24 hours")
+        updates["interval_seconds"] = interval
+
+    if "background_color" in payload:
+        background_color = payload["background_color"]
+        if not isinstance(background_color, str) or not re.fullmatch(
+            r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})", background_color
+        ):
+            raise HTTPException(status_code=400, detail="Background color must be a 3- or 6-digit hex code")
+        updates["background_color"] = background_color.upper()
+
+    if not updates:
+        raise HTTPException(status_code=400, detail="At least one setting is required")
     get_collection().update_one(
         {"_id": "personal_feed"},
-        {"$set": {"refresh_after_seconds": refresh_after}},
+        {"$set": updates},
         upsert=True,
     )
-    return {"ok": True, "refresh_after_seconds": refresh_after}
+    return {"ok": True, **updates}
 
 
 @app.get("/api/images")

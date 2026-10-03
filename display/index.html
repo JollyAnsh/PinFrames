@@ -11,6 +11,7 @@
 html, body { width:100%; height:100%; margin:0; background:var(--paper); overflow:hidden; color:var(--ink); }
 body { font-family:Georgia,"Times New Roman",serif; }
 #frame { position:fixed; inset:68px 0 58px; background:var(--paper); overflow:hidden; }
+body.immersive-mode #frame { inset:0; }
 .layer {
   position:absolute; inset:0;
   display:flex; align-items:center; justify-content:center;
@@ -37,8 +38,11 @@ body { font-family:Georgia,"Times New Roman",serif; }
 .bar { position:fixed; z-index:2; left:0; right:0; display:flex; align-items:center; justify-content:space-between; padding:0 4vw; background:var(--paper); }
 .topbar { top:0; height:68px; border-bottom:1px solid var(--line); }
 .bottombar { bottom:0; height:58px; border-top:1px solid var(--line); font:12px/1.2 Arial,sans-serif; }
-#frame:fullscreen { inset:0; width:100vw; height:100vh; background:var(--paper); }
-#frame:fullscreen .layer img { inset:4vmin; width:calc(100% - 8vmin); height:calc(100% - 8vmin); }
+body.immersive-mode .bar { transition:transform 220ms ease; }
+body.immersive-mode:not(.controls-visible) .topbar { transform:translateY(-100%); pointer-events:none; }
+body.immersive-mode:not(.controls-visible) .bottombar { transform:translateY(100%); pointer-events:none; }
+#frame:fullscreen, body.immersive-mode #frame { inset:0; width:100vw; height:100vh; height:100dvh; background:var(--paper); }
+#frame:fullscreen .layer img, body.immersive-mode .layer img { inset:4vmin; width:calc(100% - 8vmin); height:calc(100% - 8vmin); }
 .brand { display:flex; align-items:center; gap:12px; min-width:0; }
 .brand-mark { width:28px; height:28px; display:grid; place-items:center; background:var(--ink); color:var(--paper); font:bold 11px/1 Arial,sans-serif; }
 .brand-copy { display:grid; gap:3px; }
@@ -63,6 +67,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline:2px so
 .progress { position:absolute; left:0; right:0; bottom:0; height:2px; background:transparent; }
 .progress-fill { display:block; width:0; height:100%; background:var(--accent); }
 #empty { display:none; position:fixed; inset:68px 0 58px; place-items:center; padding:32px; text-align:center; color:var(--muted); font:14px/1.5 Arial,sans-serif; }
+body.immersive-mode #empty { inset:0; }
 #empty.show { display:grid; }
 dialog { width:min(420px,calc(100vw - 32px)); border:1px solid var(--line); border-radius:0; padding:24px; background:var(--paper); color:var(--ink); }
 dialog::backdrop { background:rgba(20,28,25,.48); }
@@ -82,6 +87,7 @@ dialog input { width:100%; }
   #refresh-unit { width:72px; padding-left:5px; padding-right:12px; }
   #frame { inset:180px 0 72px; }
   #empty { inset:180px 0 72px; }
+  body.immersive-mode #frame, body.immersive-mode #empty { inset:0; }
   .bottombar { height:72px; align-items:flex-start; padding-top:10px; }
   .brand-subtitle { display:none; }
   .actions { position:absolute; right:16px; bottom:8px; gap:6px; }
@@ -95,7 +101,7 @@ dialog input { width:100%; }
 }
 </style>
 </head>
-<body>
+<body class="immersive-mode">
 <header class="bar topbar">
   <div class="brand">
     <span class="brand-mark" aria-hidden="true">PF</span>
@@ -157,7 +163,7 @@ dialog input { width:100%; }
   <div class="actions">
     <button id="pause" type="button">Pause</button>
     <button id="next" type="button">Next</button>
-    <button id="fullscreen" type="button">Fullscreen</button>
+    <button id="fullscreen" type="button">Exit fullscreen</button>
   </div>
   <div class="progress" aria-hidden="true"><span class="progress-fill" id="progress"></span></div>
 </footer>
@@ -197,13 +203,15 @@ let paused=false;
 let changing=false;
 let consumeBlocked=false;
 let noticeTimer=null;
+let controlsTimer=null;
+let immersiveMode=true;
 let pinterestSignedIn=false;
 let cloudMode=false;
 let feedToken=localStorage.getItem(feedTokenKey)||'';
 
 function apiFetch(url,options={}){
   const headers=new Headers(options.headers||{});
-  if(cloudMode&&feedToken)headers.set('Authorization',`Bearer ${feedToken}`);
+  if(cloudMode&&feedToken)headers.set('Authorization','Bearer '+feedToken);
   return fetch(url,{...options,headers});
 }
 
@@ -234,7 +242,7 @@ function loadSettings(){
     }
   }catch{}
 }
-async function loadRefreshSettings(){
+async function loadSharedSettings(){
   try{
     const response=await apiFetch(settingsUrl,{cache:'no-store'});
     if(!response.ok)throw new Error(`HTTP ${response.status}`);
@@ -250,8 +258,20 @@ async function loadRefreshSettings(){
       refreshAmount.value=String(Math.max(1,Math.round(seconds/60)));
       refreshUnit.value='minutes';
     }
+    if(Number.isInteger(settings.interval_seconds)&&settings.interval_seconds>=3){
+      const useMinutes=settings.interval_seconds%60===0;
+      intervalInput.value=String(useMinutes?settings.interval_seconds/60:settings.interval_seconds);
+      unitSelect.value=useMinutes?'minutes':'seconds';
+      persistSettings();
+    }
+    if(/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(settings.background_color||'')){
+      backgroundInput.value=settings.background_color.toUpperCase();
+      document.documentElement.style.setProperty('--paper',settings.background_color);
+      persistSettings();
+    }
+    scheduleNext();
   }catch(error){
-    showNotice(`Could not load scrape schedule: ${error.message}`);
+    showNotice(`Could not load saved settings: ${error.message}`);
   }
 }
 async function loadPinterestStatus(){
@@ -303,7 +323,7 @@ async function initializeApp(){
     }else{
       await loadPinterestStatus();
     }
-    await Promise.all([loadRefreshSettings(),loadImages()]);
+    await Promise.all([loadSharedSettings(),loadImages()]);
   }catch(error){
     empty.textContent='Could not connect to the PinFrames API.';
     empty.classList.add('show');
@@ -315,10 +335,23 @@ function intervalMs(){
   intervalInput.value=String(amount);
   return amount*(unitSelect.value==='minutes'?60000:1000);
 }
+async function saveSharedSettings(updates,successMessage){
+  try{
+    const response=await apiFetch(settingsUrl,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(updates),
+    });
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    showNotice(successMessage);
+  }catch(error){
+    showNotice(`Could not save settings: ${error.message}`);
+  }
+}
 function saveSettings(){
-  intervalMs();
+  const duration=intervalMs();
   persistSettings();
-  showNotice('Timing saved');
+  saveSharedSettings({interval_seconds:Math.round(duration/1000)},'Timing saved on all devices');
   scheduleNext();
 }
 function saveBackground(){
@@ -331,7 +364,7 @@ function saveBackground(){
   backgroundInput.value=color.toUpperCase();
   document.documentElement.style.setProperty('--paper',color);
   persistSettings();
-  showNotice('Background saved');
+  saveSharedSettings({background_color:color.toUpperCase()},'Background saved on all devices');
 }
 async function saveRefreshSettings(){
   const multipliers={minutes:60,hours:3600,days:86400};
@@ -558,7 +591,7 @@ document.getElementById('feed-form').addEventListener('submit',async event=>{
     localStorage.setItem(feedTokenKey,feedToken);
     document.getElementById('feed-dialog').close();
     updateAccountButton();
-    await Promise.all([loadRefreshSettings(),loadImages()]);
+    await Promise.all([loadSharedSettings(),loadImages()]);
   }catch(error){
     feedToken=oldToken;
     showNotice(error.message);
@@ -592,13 +625,52 @@ pauseButton.addEventListener('click',()=>{
   showNotice(paused?'Rotation paused':'Rotation resumed');
   scheduleNext();
 });
-fullscreenButton.addEventListener('click',()=>{
-  if(document.fullscreenElement===frame)document.exitFullscreen?.();
-  else frame.requestFullscreen?.().catch(()=>{});
+function isFullscreen(){
+  return Boolean(document.fullscreenElement||document.webkitFullscreenElement);
+}
+function setImmersive(enabled){
+  immersiveMode=enabled;
+  document.body.classList.toggle('immersive-mode',enabled);
+  if(enabled)revealControls();
+  else{
+    clearTimeout(controlsTimer);
+    document.body.classList.remove('controls-visible');
+  }
+  fullscreenButton.textContent=enabled?'Exit fullscreen':'Fullscreen';
+}
+function revealControls(){
+  if(!immersiveMode)return;
+  document.body.classList.add('controls-visible');
+  clearTimeout(controlsTimer);
+  controlsTimer=setTimeout(()=>document.body.classList.remove('controls-visible'),3000);
+}
+fullscreenButton.addEventListener('click',async()=>{
+  if(isFullscreen()){
+    try{
+      if(document.exitFullscreen)await document.exitFullscreen();
+      else if(document.webkitExitFullscreen)document.webkitExitFullscreen();
+    }catch(error){
+      showNotice(`Could not exit fullscreen: ${error.message}`);
+    }
+    setImmersive(false);
+    return;
+  }
+  if(immersiveMode){
+    setImmersive(false);
+    return;
+  }
+  setImmersive(true);
+  try{
+    const request=document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen;
+    if(request)await request.call(document.documentElement);
+  }catch{
+    showNotice('Immersive view enabled');
+  }
 });
-document.addEventListener('fullscreenchange',()=>{
-  fullscreenButton.textContent=document.fullscreenElement===frame?'Exit fullscreen':'Fullscreen';
-});
+document.addEventListener('fullscreenchange',()=>setImmersive(isFullscreen()||immersiveMode));
+document.addEventListener('webkitfullscreenchange',()=>setImmersive(isFullscreen()||immersiveMode));
+document.addEventListener('mousemove',revealControls);
+document.addEventListener('pointerdown',revealControls);
 document.addEventListener('keydown',event=>{
   if(event.target.matches('input,select,button'))return;
   if(event.code==='Space'){
