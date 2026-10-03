@@ -209,6 +209,20 @@ let pinterestSignedIn=false;
 let cloudMode=false;
 let feedToken=localStorage.getItem(feedTokenKey)||'';
 
+function captureFeedTokenFromPath(){
+  if(location.pathname==='/'||location.pathname.split('/').filter(Boolean).length!==1)return;
+  let candidate;
+  try{
+    candidate=decodeURIComponent(location.pathname.slice(1));
+  }catch{
+    return;
+  }
+  if(!candidate)return;
+  feedToken=candidate;
+  localStorage.setItem(feedTokenKey,feedToken);
+  history.replaceState(null,'','/');
+}
+
 function apiFetch(url,options={}){
   const headers=new Headers(options.headers||{});
   if(cloudMode&&feedToken)headers.set('Authorization','Bearer '+feedToken);
@@ -682,6 +696,7 @@ document.addEventListener('keydown',event=>{
   }
 });
 loadSettings();
+captureFeedTokenFromPath();
 initializeApp();
 </script>
 </body>

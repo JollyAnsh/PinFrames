@@ -206,3 +206,11 @@ def clear_images(_authorized: None = Depends(authorize_feed)):
 @app.api_route("/", methods=["GET", "HEAD"])
 def home():
     return FileResponse(ROOT / "display" / "index.html")
+
+
+@app.api_route("/{feed_token}", methods=["GET", "HEAD"])
+def open_feed_with_token(feed_token: str):
+    return FileResponse(
+        ROOT / "display" / "index.html",
+        headers={"Referrer-Policy": "no-referrer"},
+    )

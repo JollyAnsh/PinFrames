@@ -25,7 +25,7 @@ The app creates the `personal_feed` collection automatically. The database store
 
 ## Connect a browser
 
-Open the Render URL and choose **Feed key**. Copy the generated `FEED_TOKEN` from Render's environment settings into the dialog. It is saved only in that browser's local storage. Repeat on each browser/device. Do not put the token in a URL, Git, or a public screenshot.
+Open the Render URL and choose **Feed key**. Copy the generated `FEED_TOKEN` from Render's environment settings into the dialog, or open `https://YOUR-RENDER-SERVICE.onrender.com/YOUR_PRIVATE_FEED_TOKEN` to connect it on first visit. The viewer immediately replaces the token URL with the site root and saves the token only in that browser's local storage. The initial request path may be present in hosting request logs, so prefer the dialog when that matters. Repeat on each browser/device. Do not share the token URL or put the token in Git or a public screenshot.
 
 ## Run the collector
 
